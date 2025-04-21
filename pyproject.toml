@@ -1,7 +1,13 @@
 [build-system]
 requires = [
     "setuptools>=42",
-    "wheel", 
-    "aio-pika>=9.5.5"
+    "wheel"
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "your-package-name"
+version = "0.1.0"
+dependencies = [
+    "aio-pika>=9.5.5"
+]
