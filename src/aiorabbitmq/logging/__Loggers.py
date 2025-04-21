@@ -68,6 +68,7 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
 
 
     async def consume(self, callback: Callable[[dict], Awaitable[None]]) -> None:
+        await self._setup_queue()
         
         self._callback = callback
         self._consumer_tag = await self.queue.consume(
