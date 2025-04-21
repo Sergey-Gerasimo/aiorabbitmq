@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "aiorabbitmq"
 version = "0.1.0"
 authors = [{name = "Sergey", email = "gerasimovsergey2004@gmail.com"}]
-description = "async RabbitMQ"
+description = "async RcabbitMQ"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [

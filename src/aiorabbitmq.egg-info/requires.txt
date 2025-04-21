@@ -1,0 +1,5 @@
+aio-pika>=9.5.5
+
+[dev]
+pytest>=6.0
+mypy>=0.910
