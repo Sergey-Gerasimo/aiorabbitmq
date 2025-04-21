@@ -1,0 +1,34 @@
+Metadata-Version: 2.4
+Name: aiorabbitmq
+Version: 1.0.0
+Summary: Async RabbitMQ client library for Linux systems
+Home-page: https://github.com/yourusername/aiorabbitmq
+Author: James
+Author-email: james@example.com
+Project-URL: Documentation, https://github.com/yourusername/aiorabbitmq/docs
+Project-URL: Source Code, https://github.com/yourusername/aiorabbitmq
+Project-URL: Bug Tracker, https://github.com/yourusername/aiorabbitmq/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: System :: Distributed Computing
+Classifier: Framework :: AsyncIO
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+Requires-Dist: aio-pika>=9.0.0
+Requires-Dist: pydantic>=1.9.0
+Provides-Extra: test
+Requires-Dist: pytest>=7.0.0; extra == "test"
+Requires-Dist: pytest-asyncio>=0.18.0; extra == "test"
+Provides-Extra: dev
+Requires-Dist: mypy>=0.910; extra == "dev"
+Requires-Dist: flake8>=4.0.0; extra == "dev"
+Requires-Dist: black>=22.0.0; extra == "dev"
+Dynamic: license-file

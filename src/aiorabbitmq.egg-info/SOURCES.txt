@@ -1,0 +1,10 @@
+LICENSE.txt
+README.md
+pyproject.toml
+setup.cfg
+src/aiorabbitmq.egg-info/PKG-INFO
+src/aiorabbitmq.egg-info/SOURCES.txt
+src/aiorabbitmq.egg-info/dependency_links.txt
+src/aiorabbitmq.egg-info/entry_points.txt
+src/aiorabbitmq.egg-info/requires.txt
+src/aiorabbitmq.egg-info/top_level.txt

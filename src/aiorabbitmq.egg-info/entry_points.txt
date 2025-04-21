@@ -1,0 +1,2 @@
+[console_scripts]
+aiorabbitmq-cli = aiorabbitmq.cli:main
