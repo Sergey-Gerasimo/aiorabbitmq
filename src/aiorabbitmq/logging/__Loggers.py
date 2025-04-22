@@ -1,11 +1,31 @@
 import json
 from aio_pika import Message
 from aio_pika.abc import AbstractIncomingMessage, ExchangeType
-from abc import ABC, abstractmethod
+from abc import ABC
 import asyncio 
 import logging 
 from typing import Callable, Awaitable, Literal 
+import sys
+
 from ..abc.__RabbitMQBase import RabbitMQBase
+
+
+def setup_logger(name: str = "myapp") -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    handler.setLevel(logging.INFO)
+
+    logger.addHandler(handler)
+    return logger
+
+logger = setup_logger()
 
 class LoggingSystem(ABC):
     EXCHANGE_NAME = "logs_exchange"
@@ -34,9 +54,9 @@ class LogProducer(LoggingSystem, RabbitMQBase):
                 self.create_message(level, message),
                 routing_key=level
             )
-            logging.debug(f"Log sent: {level} - {message}")
+            logger.debug(f"Log sent: {level} - {message}")
         except Exception as e:
-            logging.error(f"Failed to send log: {str(e)}")
+            logger.error(f"Failed to send log: {str(e)}")
             raise
 
 
@@ -75,7 +95,7 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
             self._process_message,
             no_ack=False
         )
-        logging.info(f"Consumer started for queue: {self.queue_name}")
+        logger.info(f"Consumer started for queue: {self.queue_name}")
 
 
     async def _process_message(self, message: AbstractIncomingMessage) -> None:
@@ -86,10 +106,10 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
                 await self._callback(log_data)
                 
         except json.JSONDecodeError:
-            logging.error("Invalid JSON format in message")
+            logger.error("Invalid JSON format in message")
             await message.reject(requeue=False)
         except Exception as e:
-            logging.error(f"Error processing message: {str(e)}")
+            logger.error(f"Error processing message: {str(e)}")
             await message.reject(requeue=True)
 
 
@@ -108,5 +128,5 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
         """Остановка потребителя"""
         if self._consumer_tag:
             await self.queue.cancel(self._consumer_tag)
-            logging.info(f"Consumer stopped for queue: {self.queue_name}")
+            logger.info(f"Consumer stopped for queue: {self.queue_name}")
 
