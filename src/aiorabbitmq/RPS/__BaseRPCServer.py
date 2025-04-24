@@ -14,6 +14,8 @@ from aio_pika.abc import (
 )
 
 
+from aiorabbitmq.__settings import logger 
+
 class BaseRPCServer(ABC):
     """
         An abstract RPC server class. 
@@ -60,7 +62,7 @@ class BaseRPCServer(ABC):
             on_return_raises=False
         )
         self.exchange = self.channel.default_exchange
-        self.logger.info("Connected to RabbitMQ")
+        logger.info("Connected to RabbitMQ")
 
     @abstractmethod
     async def validate_request(message: AbstractIncomingMessage) -> None: 
@@ -95,7 +97,7 @@ class BaseRPCServer(ABC):
                 )
 
             except Exception as e:
-                self.logger.error(f"Error processing request: {str(e)}")
+                logger.error(f"Error processing request: {str(e)}")
                 await self._send_error(message, str(e))
 
     async def _send_error(self, message: AbstractIncomingMessage, error: str) -> None:
@@ -111,7 +113,7 @@ class BaseRPCServer(ABC):
                 timeout=3
             )
         except Exception as e:
-            self.logger.error(f"Failed to send error response: {str(e)}")
+            logger.error(f"Failed to send error response: {str(e)}")
 
     async def _message_consumer(self) -> None:
         queue = await self.channel.declare_queue(
@@ -124,7 +126,7 @@ class BaseRPCServer(ABC):
             }
         )
         
-        self.logger.info(f"Started consuming from queue '{self.queue_name}'")
+        logger.info(f"Started consuming from queue '{self.queue_name}'")
         try:
             async with queue.iterator() as queue_iter:
                 async for message in queue_iter:
@@ -132,10 +134,10 @@ class BaseRPCServer(ABC):
                         break
                     asyncio.create_task(self._process_request(message))
         except asyncio.CancelledError:
-            self.logger.info("Consumer task cancelled")
+            logger.info("Consumer task cancelled")
             raise
         except Exception as e:
-            self.logger.error(f"Consumer failed: {str(e)}")
+            logger.error(f"Consumer failed: {str(e)}")
             raise
 
     async def run(self) -> None: 
@@ -164,15 +166,15 @@ class BaseRPCServer(ABC):
             await future
             
         except KeyboardInterrupt:
-            self.logger.info("Received shutdown signal")
+            logger.info("Received shutdown signal")
         except Exception as e:
-            self.logger.error(f"Unexpected error: {str(e)}")
+            logger.error(f"Unexpected error: {str(e)}")
         finally:
             await self.close()
 
     async def close(self) -> None:
         """Корректное завершение работы"""
-        self.logger.info("Starting graceful shutdown...")
+        logger.info("Starting graceful shutdown...")
         self._stop_event.set()
         
         if self._consumer_task and not self._consumer_task.done():
@@ -184,7 +186,7 @@ class BaseRPCServer(ABC):
         
         if self.connection and not self.connection.is_closed:
             await self.connection.close()
-            self.logger.info("Connection closed")
+            logger.info("Connection closed")
 
 
 async def main() -> None:

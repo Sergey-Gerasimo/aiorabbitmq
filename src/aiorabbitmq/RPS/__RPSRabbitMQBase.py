@@ -1,21 +1,13 @@
 from ..abc import RabbitMQBase
 
+from aiorabbitmq.__settings import logger 
+
 from typing import Optional, AsyncGenerator, Awaitable, Callable, MutableMapping
 from aio_pika.abc import AbstractIncomingMessage, AbstractQueue
 from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
 import json 
 import uuid 
-
-import logging
-
-# set up logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def set_up_logger(new_logger): 
-    global logger
-    logger = new_logger
     
 
 class NoCorrelationIDExeptin(Exception): pass 

@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from typing import MutableMapping
+from aiorabbitmq.__settings import logger 
 
 from aio_pika import Message, connect
 
@@ -31,7 +32,7 @@ class RPCClient:
 
     async def on_response(self, message: AbstractIncomingMessage) -> None:
         if message.correlation_id is None:
-            print(f"Bad message {message!r}")
+            logger.error(f"Bad message {message!r}")
             return
 
         future: asyncio.Future = self.futures.pop(message.correlation_id)

@@ -5,27 +5,10 @@ from abc import ABC
 import asyncio 
 import logging 
 from typing import Callable, Awaitable, Literal 
-import sys
 
+
+from aiorabbitmq.__settings import logger 
 from ..abc.__RabbitMQBase import RabbitMQBase
-
-
-def setup_logger(name: str = "logging") -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
-    handler.setLevel(logging.INFO)
-
-    logger.addHandler(handler)
-    return logger
-
-logger = setup_logger()
 
 class LoggingSystem(ABC):
     EXCHANGE_NAME = "logs_exchange"

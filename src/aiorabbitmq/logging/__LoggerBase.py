@@ -2,6 +2,8 @@ from .__Loggers import LogProducer
 from ..abc.__AbstractLogger import AbstractLogger
 from typing import Optional
 
+from aiorabbitmq.__settings import logger 
+
 class Logger(AbstractLogger): 
     def __init__(self): 
         self.logpruduser = Optional[LogProducer] = None
