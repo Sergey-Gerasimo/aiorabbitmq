@@ -8,7 +8,7 @@ from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
 import json 
 import uuid 
-from RPSExceptions import RPCError, NoCorrelationIDException    
+from RPS.RPSExceptions import RPCError, NoCorrelationIDException    
 
 
 class RPSRabbitMQBaseConsumer(RabbitMQBase): 
