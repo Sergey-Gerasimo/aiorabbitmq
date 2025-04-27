@@ -92,10 +92,6 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
         finally:
             await self.close()
 
-        
-async def callback(data: dict) -> str: 
-    print(data)
-    return json.dumps(data)
 
 class RPSRabbitMQBasePublisher(RabbitMQBase): 
     def __init__(self, amqp_url: str, exchange_name: str, routing_key: str):
@@ -129,10 +125,11 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                     future.set_exception(RPCError(message.body.decode()))
                 else:
                     future.set_result(message.body.decode())
+
         except KeyError:
             logger.warning(f"Unknown correlation ID: {message.correlation_id}")
 
-    async def call(self, message: str, timeout: float = 5.0) -> AbstractIncomingMessage:
+    async def call(self, message: str, timeout: float = 5.0) -> str:
         correlation_id = str(uuid.uuid4())
         loop = asyncio.get_running_loop()
         future = loop.create_future()
