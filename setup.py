@@ -14,7 +14,7 @@ setup(
     url="https://github.com/Sergey-Gerasimo/aiorabbitmq.git",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=[
         "aio-pika>=9.5.5",
         "aiormq>=6.8.1",
