@@ -1,49 +1,50 @@
 from ..abc import RabbitMQBase
 
-from aiorabbitmq.__settings import logger 
+from aiorabbitmq.__settings import logger
 
 from typing import Optional, AsyncGenerator, Awaitable, Callable, MutableMapping
 from aio_pika.abc import AbstractIncomingMessage, AbstractQueue
 from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
-import json 
-import uuid 
-from aiorabbitmq.RPS.RPSExceptions import RPCError, NoCorrelationIDException    
+import json
+import uuid
+from aiorabbitmq.RPS.RPSExceptions import RPCError, NoCorrelationIDException
 
 
-class RPSRabbitMQBaseConsumer(RabbitMQBase): 
-    def __init__(self, 
-                amqp_url:str, 
-                exchange_name: str, 
-                queue_name: str,
-                span: Optional[AsyncGenerator[None, None]] = None):
-        
+class RPSRabbitMQBaseConsumer(RabbitMQBase):
+    def __init__(
+        self,
+        amqp_url: str,
+        exchange_name: str,
+        queue_name: str,
+        span: Optional[AsyncGenerator[None, None]] = None,
+    ):
+
         super().__init__(amqp_url, exchange_name)
-        self.span = span 
+        self.span = span
         self.queue_name = queue_name
 
         self._stop_event = asyncio.Event()
         self._consumer_task: Optional[asyncio.Task] = None
 
-
-    async def connect(self) -> "RPSRabbitMQBaseConsumer": 
+    async def connect(self) -> "RPSRabbitMQBaseConsumer":
         await super().connect()
         return self
-    
-    async def set_up_queue(self): 
+
+    async def set_up_queue(self):
         queue = await self.channel.declare_queue(
             self.queue_name,
             durable=True,
             arguments={
                 "x-max-priority": 10,
                 "x-queue-mode": "lazy",
-                "x-dead-letter-exchange": "dead_letters"
-            }
+                "x-dead-letter-exchange": "dead_letters",
+            },
         )
 
         return queue
-    
-    async def process_message(self, message: AbstractIncomingMessage): 
+
+    async def process_message(self, message: AbstractIncomingMessage):
         try:
             async with message.process(requeue=False):
                 assert message.reply_to is not None
@@ -56,7 +57,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
                         body=response,
                         correlation_id=message.correlation_id,
                     ),
-                    routing_key=message.reply_to
+                    routing_key=message.reply_to,
                 )
 
         except json.JSONDecodeError as e:
@@ -66,7 +67,6 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
             logger.error(f"Processing error: {e}")
             await self.send_error(message, str(e))
 
-
     async def send_error(self, message: AbstractIncomingMessage, error: str) -> None:
         error_response = json.dumps({"error": error})
         await self.channel.default_exchange.publish(
@@ -74,17 +74,17 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
                 body=error_response.encode(),
                 correlation_id=message.correlation_id,
                 headers={"error": True},
-                delivery_mode=2
+                delivery_mode=2,
             ),
-            routing_key=message.reply_to
+            routing_key=message.reply_to,
         )
 
-    async def consume(self, callback: Callable[[dict], Awaitable[str]]) -> None: 
-        self.callback = callback 
+    async def consume(self, callback: Callable[[dict], Awaitable[str]]) -> None:
+        self.callback = callback
         queue = await self.set_up_queue()
-        try: 
-            async with queue.iterator() as queue_iter: 
-                async for message in queue_iter: 
+        try:
+            async with queue.iterator() as queue_iter:
+                async for message in queue_iter:
                     await self.process_message(message)
 
         except asyncio.CancelledError:
@@ -93,7 +93,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
             await self.close()
 
 
-class RPSRabbitMQBasePublisher(RabbitMQBase): 
+class RPSRabbitMQBasePublisher(RabbitMQBase):
     def __init__(self, amqp_url: str, exchange_name: str, routing_key: str):
         super().__init__(amqp_url, exchange_name)
         self.callback_queue: Optional[AbstractQueue] = None
@@ -108,19 +108,20 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
             arguments={
                 "x-max-priority": 10,
                 "x-queue-mode": "lazy",
-                "x-dead-letter-exchange": "dead_letters"
-            })
+                "x-dead-letter-exchange": "dead_letters",
+            },
+        )
         await self.callback_queue.consume(self.on_response)
         return self
-    
-    async def on_response(self, message: AbstractIncomingMessage) -> None: 
+
+    async def on_response(self, message: AbstractIncomingMessage) -> None:
         try:
             async with message.process():
                 if message.correlation_id is None:
                     raise NoCorrelationIDException(f"Bad message {message!r}")
 
                 future = self.futures.pop(message.correlation_id)
-                
+
                 if message.headers.get("error"):
                     future.set_exception(RPCError(message.body.decode()))
                 else:
@@ -152,4 +153,3 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
         except Exception as e:
             self.futures.pop(correlation_id, None)
             raise RPCError(f"Request failed: {e}") from e
-    

@@ -1,6 +1,6 @@
 from typing import Callable, Awaitable, Any, Dict, List, Union
 from functools import wraps
-import json 
+import json
 import asyncio
 import signal
 from aiorabbitmq.abc import AbstractResponseProcessor
@@ -9,19 +9,20 @@ from aiorabbitmq.RPS import RPSConsumer
 
 class ResponseProcessorError(Exception):
     """Base exception class for all processor-related errors.
-    
+
     Common cases:
     - Handler registration conflicts
-    - Missing required message fields  
+    - Missing required message fields
     - AMQP communication failures
     - Invalid message formats
     """
+
     pass
 
 
 class BaseResponseProcessor(AbstractResponseProcessor):
     """RabbitMQ message processor with decorator-based handler registration.
-    
+
     Implements complete message processing pipeline:
     - AMQP connection management
     - Handler registration via decorators
@@ -48,13 +49,13 @@ class BaseResponseProcessor(AbstractResponseProcessor):
     >>>
     >>> asyncio.run(processor.run())
     """
-   
+
     def __init__(self, amqp_url: str, exchange_name: str, queue_name: str) -> None:
         """Initialize message processor with RabbitMQ connection details.
-        
+
         Sets up:
         - Internal handler registry
-        - AMQP consumer instance  
+        - AMQP consumer instance
         - Shutdown control flag
         """
 
@@ -69,11 +70,11 @@ class BaseResponseProcessor(AbstractResponseProcessor):
 
         self._rps = RPSConsumer(self._amqp_url, self._exchange_name, self._queue_name)
 
-
-
-    def start(self, func:  Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]:
+    def start(
+        self, func: Callable[..., Awaitable[None]]
+    ) -> Callable[..., Awaitable[None]]:
         """Register service startup handler via decorator.
-        
+
         The decorated function will execute before message processing begins.
 
         Example:
@@ -83,42 +84,43 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             await cache.warm_up()
         """
         if self._on_stop is not None:
-            raise ResponseProcessorError('Shutdown handler already registered')
-        
+            raise ResponseProcessorError("Shutdown handler already registered")
+
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             """Handler wrapper enabling future functionality extensions."""
             return await func(*args, **kwargs)
-            
+
         self._on_stop = wrapper
         return wrapper
-    
 
-    def stop(self, func:  Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]: 
+    def stop(
+        self, func: Callable[..., Awaitable[None]]
+    ) -> Callable[..., Awaitable[None]]:
         """Register service shutdown handler via decorator.
-        
+
         The decorated function will execute during graceful shutdown.
 
         Example:
-        @processor.stop  
+        @processor.stop
         async def cleanup():
             await release_resources()
             await send_metrics()
         """
         if self._on_stop is not None:
-            raise ResponseProcessorError('Shutdown handler already registered')
-        
+            raise ResponseProcessorError("Shutdown handler already registered")
+
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             """Handler wrapper enabling future functionality extensions."""
             return await func(*args, **kwargs)
-            
+
         self._on_stop = wrapper
         return wrapper
 
-    async def run(self): 
+    async def run(self):
         """Start message processing loop with graceful shutdown support.
-        
+
         Execution flow:
         1. Connect to AMQP
         2. Register signal handlers (SIGTERM/SIGINT)
@@ -126,19 +128,19 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         4. Begin message consumption
         5. Wait for shutdown signal
         6. Execute shutdown handler
-        
+
         Handles:
         - Docker SIGTERM
         - KeyboardInterrupt (SIGINT)
         - AMQP connection errors
         - Unexpected exceptions during processing
-        
+
         Note:
         Should be run via asyncio.run() or equivalent.
         """
         try:
             await self._rps.connect()
-            
+
             loop = asyncio.get_running_loop()
             for sig in (signal.SIGTERM, signal.SIGINT):
                 loop.add_signal_handler(sig, self._shutdown)
@@ -146,9 +148,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             if self._on_start:
                 await self._on_start()
 
-            await asyncio.create_task(
-                self._rps.consume(self.handle_messages)
-            )
+            await asyncio.create_task(self._rps.consume(self.handle_messages))
             await self._should_stop.wait()
 
         except asyncio.CancelledError:
@@ -162,28 +162,28 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             if self._on_stop:
                 await self._on_stop()
 
-
     async def _shutdown(self) -> None:
         """Internal graceful shutdown procedure.
-        
+
         1. Close AMQP connection
         2. Cancel pending tasks
         3. Set shutdown flag
         """
 
         await self._rps.close()
-        
+
         current = asyncio.current_task()
         for task in (t for t in asyncio.all_tasks() if t is not current):
             task.cancel()
-        
+
         await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
         self._should_stop.set()
 
-
-    def add(self, action: str) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    def add(
+        self, action: str
+    ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
         """Register action handler through decorator syntax.
-        
+
         Args:
             action: Unique action identifier string. Must follow
                    [service]_[entity]_[operation] naming pattern
@@ -202,24 +202,27 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         if action in self._handlers:
             raise ResponseProcessorError(f'Action "{action}" already registered')
 
-        def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        def decorator(
+            func: Callable[..., Awaitable[Any]],
+        ) -> Callable[..., Awaitable[Any]]:
             """Inner decorator performing actual registration.
-            
+
             Args:
                 func: Async handler function with signature:
                     async def(data: Dict) -> Any
 
             Returns:
                 Original function with registration side-effect
-            
+
             Preserves:
                 Original function metadata using functools.wraps
             """
+
             @wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 """Handler wrapper enabling future functionality extensions."""
                 return await func(*args, **kwargs)
-            
+
             self._handlers[action] = wrapper
             return wrapper
 
@@ -227,7 +230,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
 
     async def handle_messages(self, data: Dict[str, Any]) -> str:
         """Process incoming message and generate standardized response.
-        
+
         Args:
             data: Input message dictionary. Required structure:
                 {
@@ -252,7 +255,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         >>> message = {'action': 'calc', 'data': {'x': 2, 'y': 3}}
         >>> response = await processor.handle_messages(message)
         """
-        try: 
+        try:
             # Validate message structure
             required_fields = {"action", "data"}
             if not required_fields.issubset(data.keys()):
@@ -260,27 +263,31 @@ class BaseResponseProcessor(AbstractResponseProcessor):
                 raise ValueError(f"Missing required fields: {missing}")
 
             # Execute handler
-            handler = self.get_handler(data['action'])
-            result = await handler(data['data'])
+            handler = self.get_handler(data["action"])
+            result = await handler(data["data"])
 
             # Format success response
-            return json.dumps({
-                "status": "success",
-                "response": result,
-                "user_id": data.get("user_id")
-            })
+            return json.dumps(
+                {
+                    "status": "success",
+                    "response": result,
+                    "user_id": data.get("user_id"),
+                }
+            )
 
-        except (KeyError, ResponseProcessorError) as e: 
+        except (KeyError, ResponseProcessorError) as e:
             # Format error response
-            return json.dumps({
-                "status": "error",
-                "message": f"Processing error: {str(e)}",
-                "user_id": data.get("user_id", "unknown")
-            })
+            return json.dumps(
+                {
+                    "status": "error",
+                    "message": f"Processing error: {str(e)}",
+                    "user_id": data.get("user_id", "unknown"),
+                }
+            )
 
     def get_handler(self, action: str) -> Callable[..., Awaitable[Any]]:
         """Retrieve registered handler by action identifier.
-        
+
         Args:
             action: String identifier of registered action
 
@@ -297,11 +304,11 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         if action not in self._handlers:
             raise ResponseProcessorError(f'No handler registered for: "{action}"')
         return self._handlers[action]
-    
+
     @property
     def registered_actions(self) -> List[str]:
         """Get list of registered action identifiers.
-        
+
         Returns:
             List of action strings in insertion order
 
@@ -310,4 +317,3 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         ['user_create', 'email_verify']
         """
         return list(self._handlers.keys())
-    

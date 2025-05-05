@@ -1,12 +1,15 @@
 import asyncio
 import uuid
 from typing import MutableMapping
-from aiorabbitmq.__settings import logger 
+from aiorabbitmq.__settings import logger
 
 from aio_pika import Message, connect
 
 from aio_pika.abc import (
-    AbstractChannel, AbstractConnection, AbstractIncomingMessage, AbstractQueue,
+    AbstractChannel,
+    AbstractConnection,
+    AbstractIncomingMessage,
+    AbstractQueue,
 )
 
 
@@ -15,12 +18,10 @@ class RPCClient:
     channel: AbstractChannel
     callback_queue: AbstractQueue
 
-
     def __init__(self) -> None:
         self.futures: MutableMapping[AbstractIncomingMessage, asyncio.Future] = {}
 
-
-    async def connect(self, amqp_url:str, routing_key:str) -> "RPCClient":
+    async def connect(self, amqp_url: str, routing_key: str) -> "RPCClient":
         self.connection = await connect(amqp_url)
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(exclusive=True)
@@ -29,7 +30,6 @@ class RPCClient:
 
         return self
 
-
     async def on_response(self, message: AbstractIncomingMessage) -> None:
         if message.correlation_id is None:
             logger.error(f"Bad message {message!r}")
@@ -37,7 +37,6 @@ class RPCClient:
 
         future: asyncio.Future = self.futures.pop(message.correlation_id)
         future.set_result(message)
-
 
     async def call(self, message: str) -> AbstractIncomingMessage:
         correlation_id = str(uuid.uuid4())
@@ -60,7 +59,9 @@ class RPCClient:
 
 
 async def main() -> None:
-    fibonacci_rpc = await RPCClient().connect("amqp://guest:guest@localhost/", "rpc_queue")
+    fibonacci_rpc = await RPCClient().connect(
+        "amqp://guest:guest@localhost/", "rpc_queue"
+    )
     response = await fibonacci_rpc.call(str(30))
     print(response.body)
 

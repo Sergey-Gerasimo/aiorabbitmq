@@ -2,23 +2,24 @@ import json
 from aio_pika import Message
 from aio_pika.abc import AbstractIncomingMessage, ExchangeType
 from abc import ABC
-import asyncio 
-import logging 
-from typing import Callable, Awaitable, Literal 
+import asyncio
+import logging
+from typing import Callable, Awaitable, Literal
 
 
-from aiorabbitmq.__settings import logger 
+from aiorabbitmq.__settings import logger
 from ..abc.__RabbitMQBase import RabbitMQBase
+
 
 class LoggingSystem(ABC):
     EXCHANGE_NAME = "logs_exchange"
     EXCHANGE_TYPE = ExchangeType.TOPIC
-    
+
     @staticmethod
     def create_message(level: str, message: str) -> Message:
         return Message(
             body=json.dumps({"level": level, "message": message}).encode(),
-            delivery_mode=2  # Сохранять сообщения на диск
+            delivery_mode=2,  # Сохранять сообщения на диск
         )
 
 
@@ -34,8 +35,7 @@ class LogProducer(LoggingSystem, RabbitMQBase):
 
         try:
             await self.exchange.publish(
-                self.create_message(level, message),
-                routing_key=level
+                self.create_message(level, message), routing_key=level
             )
             logger.debug(f"Log sent: {level} - {message}")
         except Exception as e:
@@ -44,17 +44,20 @@ class LogProducer(LoggingSystem, RabbitMQBase):
 
 
 class LogConsumer(LoggingSystem, RabbitMQBase):
-    def __init__(self, amqp_url: str, queue_name: str, levels: list[Literal["warning", "error", "info"]]):
+    def __init__(
+        self,
+        amqp_url: str,
+        queue_name: str,
+        levels: list[Literal["warning", "error", "info"]],
+    ):
         super().__init__(amqp_url, self.EXCHANGE_NAME, self.EXCHANGE_TYPE)
         self.queue_name = queue_name
         self.levels = levels
         self.callback = None
 
-
-    async def set_up(self): 
+    async def set_up(self):
         await self.connect()
         await self._setup_queue()
-
 
     async def _setup_queue(self):
         self.queue = await self.channel.declare_queue(
@@ -62,24 +65,21 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
             durable=True,
             arguments={
                 "x-dead-letter-exchange": "dead_letters",
-                "x-queue-mode": "lazy"
-            }
+                "x-queue-mode": "lazy",
+            },
         )
-        
+
         for level in self.levels:
             await self.queue.bind(self.exchange, routing_key=level)
 
-
     async def consume(self, callback: Callable[[dict], Awaitable[None]]) -> None:
         await self._setup_queue()
-        
+
         self._callback = callback
         self._consumer_tag = await self.queue.consume(
-            self._process_message,
-            no_ack=False
+            self._process_message, no_ack=False
         )
         logger.info(f"Consumer started for queue: {self.queue_name}")
-
 
     async def _process_message(self, message: AbstractIncomingMessage) -> None:
         """Обработка входящих сообщений"""
@@ -87,7 +87,7 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
             async with message.process():
                 log_data = await self._parse_message(message)
                 await self._callback(log_data)
-                
+
         except json.JSONDecodeError:
             logger.error("Invalid JSON format in message")
             await message.reject(requeue=False)
@@ -95,21 +95,18 @@ class LogConsumer(LoggingSystem, RabbitMQBase):
             logger.error(f"Error processing message: {str(e)}")
             await message.reject(requeue=True)
 
-
     async def _parse_message(self, message: AbstractIncomingMessage) -> dict:
         """Парсинг и валидация сообщения"""
         body = message.body.decode()
         data = json.loads(body)
-        
+
         if not all(key in data for key in ("level", "message")):
             raise ValueError("Invalid log message structure")
-            
+
         return data
-    
 
     async def stop(self) -> None:
         """Остановка потребителя"""
         if self._consumer_tag:
             await self.queue.cancel(self._consumer_tag)
             logger.info(f"Consumer stopped for queue: {self.queue_name}")
-

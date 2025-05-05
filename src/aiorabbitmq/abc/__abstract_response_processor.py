@@ -1,9 +1,10 @@
 from abc import abstractmethod, ABC
-from typing import Callable, Awaitable, Any, Dict 
+from typing import Callable, Awaitable, Any, Dict
+
 
 class AbstractResponseProcessor(ABC):
     """Abstract base class defining the microservice response processor interface.
-    
+
     Provides core functionality blueprint for:
     - Asynchronous action handler registration
     - Message validation and routing
@@ -18,34 +19,39 @@ class AbstractResponseProcessor(ABC):
     1. Create subclass implementing abstract methods
     2. Register handlers using @add() decorator
     3. Process messages through handle_messages()
-    
+
     Example:
     class MyProcessor(AbstractResponseProcessor):
         ...implementation...
     """
-    
+
     @abstractmethod
-    def add(self, action: str) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    def add(
+        self, action: str
+    ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
         """Abstract method for handler registration decorator."""
-        pass 
+        pass
 
     @abstractmethod
-    def start(self, func:  Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]: 
+    def start(
+        self, func: Callable[..., Awaitable[None]]
+    ) -> Callable[..., Awaitable[None]]:
         "Abstract method for start registration decorator"
-        pass 
+        pass
 
     @abstractmethod
-    def stop(self, func:  Callable[..., Awaitable[None]]) -> Callable[..., Awaitable[None]]: 
+    def stop(
+        self, func: Callable[..., Awaitable[None]]
+    ) -> Callable[..., Awaitable[None]]:
         "Abstract method for stop registration decorator"
-        pass 
+        pass
 
     @abstractmethod
     async def handle_messages(self, data: Dict[str, Any]) -> str:
         """Abstract method for message processing."""
-        pass 
+        pass
 
     @abstractmethod
-    async def run(self) -> None: 
+    async def run(self) -> None:
         """Abstract mehtod for start ResponseProcessor implimintation"""
-        pass 
-    
+        pass

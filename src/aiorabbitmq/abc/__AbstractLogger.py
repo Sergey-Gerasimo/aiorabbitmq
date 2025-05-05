@@ -1,11 +1,15 @@
 from abc import ABC, abstractmethod
 
-class AbstractLogger(ABC): 
+
+class AbstractLogger(ABC):
     @abstractmethod
-    async def info(self, message: str) -> None: pass 
+    async def info(self, message: str) -> None:
+        pass
 
     @abstractmethod
-    async def error(self, message: str) -> None: pass 
+    async def error(self, message: str) -> None:
+        pass
 
     @abstractmethod
-    async def warning(self, message: str) -> None: pass 
+    async def warning(self, message: str) -> None:
+        pass

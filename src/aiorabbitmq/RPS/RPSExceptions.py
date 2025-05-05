@@ -1,3 +1,6 @@
-class NoCorrelationIDException(Exception): pass
+class NoCorrelationIDException(Exception):
+    pass
 
-class RPCError(Exception): pass
+
+class RPCError(Exception):
+    pass

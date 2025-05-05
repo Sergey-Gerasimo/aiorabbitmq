@@ -4,9 +4,16 @@ from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractConnection
 from typing import Optional
 
 
-class RabbitMQBase(ABC): 
+class RabbitMQBase(ABC):
     """Базовый класс для publisher и consumer в RabbitMQ"""
-    def __init__(self, amqp_url: str, exchange_name: str, exchange_type: ExchangeType = ExchangeType.DIRECT, durable=True):
+
+    def __init__(
+        self,
+        amqp_url: str,
+        exchange_name: str,
+        exchange_type: ExchangeType = ExchangeType.DIRECT,
+        durable=True,
+    ):
         self.amqp_url = amqp_url
         self.exchange_name = exchange_name
         self.exchange_type = exchange_type
@@ -19,9 +26,7 @@ class RabbitMQBase(ABC):
         self.connection = await connect(self.amqp_url)
         self.channel = await self.connection.channel()
         self.exchange = await self.channel.declare_exchange(
-            self.exchange_name,
-            self.exchange_type,
-            durable=self.durable
+            self.exchange_name, self.exchange_type, durable=self.durable
         )
 
         return self
