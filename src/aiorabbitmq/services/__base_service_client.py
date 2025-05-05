@@ -1,5 +1,5 @@
-from aiorabbitmq.RPS import RPSPublisher
-from aiorabbitmq.RPS.RPSExceptions import RPCError
+from aiorabbitmq.RPC import RPSPublisher
+from aiorabbitmq.RPC.RPSExceptions import RPCError
 from aiorabbitmq.abc import AbstractServiceClient
 
 from abc import ABC, abstractmethod
@@ -136,3 +136,6 @@ class BaseServiceClient(AbstractServiceClient):
                 raise ServiceExecuteError("Service operation failed") from e
 
         return wrapper
+
+
+__all__ = ["ServiceConnectionError", "ServiceExecuteError", "BaseServiceClient"]

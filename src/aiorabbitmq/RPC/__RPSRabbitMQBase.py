@@ -8,7 +8,7 @@ from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
 import json
 import uuid
-from aiorabbitmq.RPS.RPSExceptions import RPSError, NoCorrelationIDException
+from aiorabbitmq.RPC.RPSExceptions import RPCError, NoCorrelationIDException
 
 
 class RPSRabbitMQBaseConsumer(RabbitMQBase):
@@ -117,7 +117,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 future = self.futures.pop(message.correlation_id)
 
                 if message.headers.get("error"):
-                    future.set_exception(RPSError(message.body.decode()))
+                    future.set_exception(RPCError(message.body.decode()))
                 else:
                     future.set_result(message.body.decode())
 
@@ -143,7 +143,10 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
             return await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:
             self.futures.pop(correlation_id, None)
-            raise RPSError("Request timed out") from None
+            raise RPCError("Request timed out") from None
         except Exception as e:
             self.futures.pop(correlation_id, None)
-            raise RPSError(f"Request failed: {e}") from e
+            raise RPCError(f"Request failed: {e}") from e
+
+
+__all__ = ["RPSRabbitMQBaseConsumer", "RPSRabbitMQBasePublisher"]

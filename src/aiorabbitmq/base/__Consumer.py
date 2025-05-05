@@ -122,6 +122,13 @@ class RabbitMQConsumer(RabbitMQBase):
             logger.error(f"Processing failed: {e}", exc_info=True)
             await message.reject(requeue=False)
 
+    async def disconect(self):
+        if self.channel is not None:
+            await self.channel.close()
+
+        if self.connection is not None:
+            await self.connection.close()
+
     async def consume(self, callback: Callable[[dict], Awaitable[None]]):
         """Starts continuous message consumption with retry logic.
 
@@ -162,7 +169,7 @@ class RabbitMQConsumer(RabbitMQBase):
                     async for message in queue_iter:
                         await self.process_message(message)
                         attempt = 0  # Reset on successful processing
-
+                        return
             except asyncio.CancelledError:
                 logger.info("Consumption stopped by cancellation")
                 break
@@ -170,6 +177,8 @@ class RabbitMQConsumer(RabbitMQBase):
                 logger.error(f"Permanent error: {e}")
                 raise
             except Exception as e:
+                await self.reconnect()
+                print("Reconnecting")
                 attempt += 1
                 delay = min(
                     retry_policy["max_delay"],
@@ -184,3 +193,10 @@ class RabbitMQConsumer(RabbitMQBase):
         if attempt >= retry_policy["max_attempts"]:
             logger.critical("Maximum retry attempts reached")
             raise ConnectionError("Failed to establish stable connection")
+
+    async def reconnect(self):
+        await self.disconect()
+        await self.connect()
+
+
+__all__ = ["RabbitMQConsumer"]

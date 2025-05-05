@@ -4,7 +4,7 @@ import json
 import asyncio
 import signal
 from aiorabbitmq.abc import AbstractResponseProcessor
-from aiorabbitmq.RPS import RPSConsumer
+from aiorabbitmq.RPC import RPCConsumer
 
 
 class ResponseProcessorError(Exception):
@@ -68,7 +68,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         self._exchange_name = exchange_name
         self._queue_name = queue_name
 
-        self._rps = RPSConsumer(self._amqp_url, self._exchange_name, self._queue_name)
+        self._rps = RPCConsumer(self._amqp_url, self._exchange_name, self._queue_name)
 
     def start(
         self, func: Callable[..., Awaitable[None]]
@@ -317,3 +317,6 @@ class BaseResponseProcessor(AbstractResponseProcessor):
         ['user_create', 'email_verify']
         """
         return list(self._handlers.keys())
+
+
+__all__ = ["ResponseProcessorError", "BaseResponseProcessor"]

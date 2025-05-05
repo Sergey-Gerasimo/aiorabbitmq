@@ -1,5 +1,4 @@
 from aiorabbitmq.abc import RabbitMQBase
-
 from aio_pika import ExchangeType, Message
 import json
 from typing import Optional, Callable, Any
@@ -127,3 +126,6 @@ class RabbitMQPublisher(RabbitMQBase):
         if exc_type is not None:
             RabbitMQError(f"Transaction error: {exc_val}")
         return False
+
+
+__all__ = ["RabbitMQPublisher", "RabbitMQError"]

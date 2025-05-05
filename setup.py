@@ -23,10 +23,12 @@ setup(
     ],
     extras_require={
         "dev": [
-            "pytest>=6.0",
             "mypy>=0.910",
             "flake8>=4.0",
             "black>=22.0",
+            "pytest>=7.0",
+            "pytest-asyncio",
+            "aio-pika",
         ]
     },
     classifiers=[
