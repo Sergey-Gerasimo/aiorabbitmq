@@ -8,7 +8,7 @@ from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
 import json
 import uuid
-from aiorabbitmq.RPS.RPSExceptions import RPCError, NoCorrelationIDException
+from aiorabbitmq.RPS.RPSExceptions import RPSError, NoCorrelationIDException
 
 
 class RPSRabbitMQBaseConsumer(RabbitMQBase):
@@ -17,19 +17,13 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
         amqp_url: str,
         exchange_name: str,
         queue_name: str,
-        span: Optional[AsyncGenerator[None, None]] = None,
     ):
 
         super().__init__(amqp_url, exchange_name)
-        self.span = span
         self.queue_name = queue_name
 
         self._stop_event = asyncio.Event()
         self._consumer_task: Optional[asyncio.Task] = None
-
-    async def connect(self) -> "RPSRabbitMQBaseConsumer":
-        await super().connect()
-        return self
 
     async def set_up_queue(self):
         queue = await self.channel.declare_queue(
@@ -123,7 +117,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 future = self.futures.pop(message.correlation_id)
 
                 if message.headers.get("error"):
-                    future.set_exception(RPCError(message.body.decode()))
+                    future.set_exception(RPSError(message.body.decode()))
                 else:
                     future.set_result(message.body.decode())
 
@@ -149,7 +143,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
             return await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:
             self.futures.pop(correlation_id, None)
-            raise RPCError("Request timed out") from None
+            raise RPSError("Request timed out") from None
         except Exception as e:
             self.futures.pop(correlation_id, None)
-            raise RPCError(f"Request failed: {e}") from e
+            raise RPSError(f"Request failed: {e}") from e

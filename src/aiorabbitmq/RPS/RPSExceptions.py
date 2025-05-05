@@ -2,5 +2,5 @@ class NoCorrelationIDException(Exception):
     pass
 
 
-class RPCError(Exception):
+class RPSError(Exception):
     pass
