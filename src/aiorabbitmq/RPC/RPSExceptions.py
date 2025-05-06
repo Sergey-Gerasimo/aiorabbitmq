@@ -4,3 +4,6 @@ class NoCorrelationIDException(Exception):
 
 class RPCError(Exception):
     pass
+
+
+__all__ = ["RPCError", "NoCorrelationIDException"]

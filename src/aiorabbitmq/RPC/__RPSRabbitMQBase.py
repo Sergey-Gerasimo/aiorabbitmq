@@ -8,7 +8,7 @@ from aio_pika import Message, connect, RobustConnection, ExchangeType
 import asyncio
 import json
 import uuid
-from aiorabbitmq.RPS.RPSExceptions import RPCError, NoCorrelationIDException
+from aiorabbitmq.RPC.RPSExceptions import RPCError, NoCorrelationIDException
 
 
 class RPSRabbitMQBaseConsumer(RabbitMQBase):
@@ -17,19 +17,15 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
         amqp_url: str,
         exchange_name: str,
         queue_name: str,
-        span: Optional[AsyncGenerator[None, None]] = None,
+        exchange_type: ExchangeType = ExchangeType.DIRECT,
     ):
 
-        super().__init__(amqp_url, exchange_name)
-        self.span = span
+        super().__init__(amqp_url, exchange_name, exchange_type=exchange_type)
         self.queue_name = queue_name
 
         self._stop_event = asyncio.Event()
         self._consumer_task: Optional[asyncio.Task] = None
-
-    async def connect(self) -> "RPSRabbitMQBaseConsumer":
-        await super().connect()
-        return self
+        self.callback: Optional[Callable[..., Awaitable[dict]]] = None
 
     async def set_up_queue(self):
         queue = await self.channel.declare_queue(
@@ -41,21 +37,23 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
                 "x-dead-letter-exchange": "dead_letters",
             },
         )
-
+        await queue.bind(self.exchange, self.queue_name)
         return queue
 
     async def process_message(self, message: AbstractIncomingMessage):
         try:
             async with message.process(requeue=False):
-                assert message.reply_to is not None
+                if message.reply_to is None:
+                    raise NoCorrelationIDException("Message has no correlation id")
 
                 data = json.loads(message.body.decode())
                 response = await self.callback(data)
                 response = response.encode()
-                await self.channel.default_exchange.publish(
+                await self.exchange.publish(
                     Message(
                         body=response,
                         correlation_id=message.correlation_id,
+                        headers={"error": False},
                     ),
                     routing_key=message.reply_to,
                 )
@@ -69,7 +67,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
 
     async def send_error(self, message: AbstractIncomingMessage, error: str) -> None:
         error_response = json.dumps({"error": error})
-        await self.channel.default_exchange.publish(
+        await self.exchange.publish(
             Message(
                 body=error_response.encode(),
                 correlation_id=message.correlation_id,
@@ -111,6 +109,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 "x-dead-letter-exchange": "dead_letters",
             },
         )
+        await self.callback_queue.bind(self.exchange, self.callback_queue.name)
         await self.callback_queue.consume(self.on_response)
         return self
 
@@ -136,7 +135,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
         future = loop.create_future()
         self.futures[correlation_id] = future
         try:
-            await self.channel.default_exchange.publish(
+            await self.exchange.publish(
                 Message(
                     message.encode(),
                     content_type="text/plain",
@@ -146,10 +145,13 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 routing_key=self.routing_key,
             )
 
-            return await asyncio.wait_for(future, timeout)
+            return await asyncio.wait_for(self.futures[correlation_id], timeout)
         except asyncio.TimeoutError:
             self.futures.pop(correlation_id, None)
             raise RPCError("Request timed out") from None
         except Exception as e:
             self.futures.pop(correlation_id, None)
             raise RPCError(f"Request failed: {e}") from e
+
+
+__all__ = ["RPSRabbitMQBaseConsumer", "RPSRabbitMQBasePublisher"]

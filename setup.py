@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="aiorabbitmq",
-    version="0.1.0",
+    version="1.0.0",
     author="Sergey",
     author_email="gerasimovsergey2004@gmail.com",
     description="Short description of your package",
@@ -23,10 +23,14 @@ setup(
     ],
     extras_require={
         "dev": [
-            "pytest>=6.0",
             "mypy>=0.910",
             "flake8>=4.0",
             "black>=22.0",
+            "pytest>=7.0",
+            "pytest-asyncio",
+            "aio-pika",
+            "tenacity",
+            "docker",
         ]
     },
     classifiers=[

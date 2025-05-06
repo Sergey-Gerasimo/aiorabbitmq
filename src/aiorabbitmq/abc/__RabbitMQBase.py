@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from aio_pika import connect, ExchangeType
+from aio_pika import ExchangeType
 from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractConnection
 from typing import Optional
+import aio_pika
 
 
 class RabbitMQBase(ABC):
@@ -23,7 +24,7 @@ class RabbitMQBase(ABC):
         self.exchange: Optional[AbstractExchange] = None
 
     async def connect(self) -> "RabbitMQBase":
-        self.connection = await connect(self.amqp_url)
+        self.connection = await aio_pika.connect(self.amqp_url)
         self.channel = await self.connection.channel()
         self.exchange = await self.channel.declare_exchange(
             self.exchange_name, self.exchange_type, durable=self.durable
@@ -32,5 +33,13 @@ class RabbitMQBase(ABC):
         return self
 
     async def close(self) -> None:
-        if self.connection:
+        if self.connection is not None:
             await self.connection.close()
+
+        if self.channel is not None:
+            await self.channel.close()
+
+
+__all__ = [
+    "RabbitMQBase",
+]
