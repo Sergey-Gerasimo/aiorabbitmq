@@ -2,3 +2,4 @@
 *venv*
 *.DS*
 .pytest_cache
+*.log
