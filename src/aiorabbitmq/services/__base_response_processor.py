@@ -4,7 +4,7 @@ import json
 import asyncio
 import signal
 from aiorabbitmq.abc import AbstractResponseProcessor
-from aiorabbitmq.RPC import RPCConsumer
+from aiorabbitmq.RPC.__RPSRabbitMQBase import RPSRabbitMQBaseConsumer as RPCConsumer
 
 
 class ResponseProcessorError(Exception):
@@ -83,7 +83,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             await setup_database()
             await cache.warm_up()
         """
-        if self._on_stop is not None:
+        if self._on_start is not None:
             raise ResponseProcessorError("Shutdown handler already registered")
 
         @wraps(func)
@@ -91,7 +91,7 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             """Handler wrapper enabling future functionality extensions."""
             return await func(*args, **kwargs)
 
-        self._on_stop = wrapper
+        self._on_start = wrapper
         return wrapper
 
     def stop(
@@ -148,13 +148,14 @@ class BaseResponseProcessor(AbstractResponseProcessor):
             if self._on_start:
                 await self._on_start()
 
-            await asyncio.create_task(self._rps.consume(self.handle_messages))
+            self._consume_task = asyncio.create_task(
+                self._rps.consume(self.handle_messages)
+            )
             await self._should_stop.wait()
 
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            await self._shutdown()
             raise ResponseProcessorError(f"Service failed: {str(e)}")
         finally:
             if not self._should_stop.is_set():
@@ -163,20 +164,16 @@ class BaseResponseProcessor(AbstractResponseProcessor):
                 await self._on_stop()
 
     async def _shutdown(self) -> None:
-        """Internal graceful shutdown procedure.
-
-        1. Close AMQP connection
-        2. Cancel pending tasks
-        3. Set shutdown flag
-        """
+        """Internal graceful shutdown procedure."""
+        # Отменяем только consume task
+        if hasattr(self, "_consume_task"):
+            self._consume_task.cancel()
+            try:
+                await self._consume_task
+            except asyncio.CancelledError:
+                pass
 
         await self._rps.close()
-
-        current = asyncio.current_task()
-        for task in (t for t in asyncio.all_tasks() if t is not current):
-            task.cancel()
-
-        await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
         self._should_stop.set()
 
     def add(

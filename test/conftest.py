@@ -1,5 +1,7 @@
 import pytest
 import asyncio
+from unittest.mock import AsyncMock, patch
+from aio_pika import RobustConnection
 
 
 @pytest.fixture(scope="session")

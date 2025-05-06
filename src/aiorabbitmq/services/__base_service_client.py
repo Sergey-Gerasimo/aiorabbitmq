@@ -1,4 +1,4 @@
-from aiorabbitmq.RPC import RPSPublisher
+from aiorabbitmq.RPC import RPCPublisher
 from aiorabbitmq.RPC.RPSExceptions import RPCError
 from aiorabbitmq.abc import AbstractServiceClient
 
@@ -41,7 +41,7 @@ class BaseServiceClient(AbstractServiceClient):
         self.exchange_name = exchange_name
         self.routing_key = routing_key
 
-        self.RPS = RPSPublisher(
+        self.RPS = RPCPublisher(
             amqp_url=amqp_url, exchange_name=exchange_name, routing_key=routing_key
         )
 

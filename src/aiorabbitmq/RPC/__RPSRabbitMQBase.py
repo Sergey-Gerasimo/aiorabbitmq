@@ -24,6 +24,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
 
         self._stop_event = asyncio.Event()
         self._consumer_task: Optional[asyncio.Task] = None
+        self.callback: Optional[Callable[..., Awaitable[dict]]] = None
 
     async def set_up_queue(self):
         queue = await self.channel.declare_queue(
@@ -50,6 +51,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
                     Message(
                         body=response,
                         correlation_id=message.correlation_id,
+                        headers={"error": False},
                     ),
                     routing_key=message.reply_to,
                 )
@@ -140,7 +142,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 routing_key=self.routing_key,
             )
 
-            return await asyncio.wait_for(future, timeout)
+            return await asyncio.wait_for(self.futures[correlation_id], timeout)
         except asyncio.TimeoutError:
             self.futures.pop(correlation_id, None)
             raise RPCError("Request timed out") from None
