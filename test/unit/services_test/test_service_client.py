@@ -19,6 +19,7 @@ class TestBaseServiceClient:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_initial_state(self, client):
         assert client.amqp_url == "amqp://guest:guest@localhost/"
         assert client.exchange_name == "test_exchange"
@@ -26,6 +27,7 @@ class TestBaseServiceClient:
         assert not client.is_connected
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_successful_connection(self, client):
         with patch.object(client.RPS, "connect", AsyncMock()) as mock_connect:
             await client.connect()
@@ -33,6 +35,7 @@ class TestBaseServiceClient:
             assert client.is_connected
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_failed_connection(self, client):
         with patch.object(
             client.RPS, "connect", AsyncMock(side_effect=Exception("Connection failed"))
@@ -43,6 +46,7 @@ class TestBaseServiceClient:
             assert not client.is_connected
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_disconnection(self, client):
         with patch.object(client.RPS, "close", AsyncMock()) as mock_close:
             client._is_connected = True
@@ -51,6 +55,7 @@ class TestBaseServiceClient:
             assert not client.is_connected
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_context_manager_success(self, client):
         with patch.object(client, "connect", AsyncMock()) as mock_connect, patch.object(
             client, "disconnect", AsyncMock()
@@ -62,8 +67,8 @@ class TestBaseServiceClient:
 
             mock_disconnect.assert_awaited_once()
 
-    pytest.mark.asyncio
-
+    @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_context_manager_error(self, client):
         with patch.object(client, "connect", AsyncMock()), patch.object(
             client, "disconnect", AsyncMock()
@@ -76,6 +81,7 @@ class TestBaseServiceClient:
             mock_disconnect.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handle_rpc_response_success(self, client):
         @BaseServiceClient.handle_rpc_response
         async def test_method(self, *args, **kwargs):
@@ -93,6 +99,7 @@ class TestBaseServiceClient:
             mock_call.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handle_rpc_response_not_connected(self, client):
         @BaseServiceClient.handle_rpc_response
         async def test_method(self, *args, **kwargs):
@@ -102,6 +109,7 @@ class TestBaseServiceClient:
             await test_method(client)
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handle_rpc_response_rpc_error(self, client):
         @BaseServiceClient.handle_rpc_response
         async def test_method(self, *args, **kwargs):
@@ -115,6 +123,7 @@ class TestBaseServiceClient:
             await test_method(client)
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handle_rpc_response_invalid_json(slef, client):
         @BaseServiceClient.handle_rpc_response
         async def test_method(self, *args, **kwargs):
@@ -128,6 +137,7 @@ class TestBaseServiceClient:
             await test_method(client)
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handle_rpc_response_unexpected_error(self, client):
         @BaseServiceClient.handle_rpc_response
         async def test_method(self, *args, **kwargs):

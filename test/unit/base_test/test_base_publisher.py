@@ -16,6 +16,7 @@ class TestPublisher:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_connection(
         self,
         publisher: Publisher,
@@ -32,6 +33,7 @@ class TestPublisher:
         mock_rabbit["channel"].declare_exchange.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_disconnect(
         self, publisher: Publisher, mock_rabbit: dict[str, AsyncMock]
     ):
@@ -49,6 +51,7 @@ class TestPublisher:
         mock_rabbit["channel"].close.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_connection_error(self, publisher: Publisher):
         """Test handling of connection errors"""
         with patch(
@@ -59,6 +62,7 @@ class TestPublisher:
                 await publisher.connect()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_publish_message(self, publisher, mock_rabbit):
         """Test message publishing functionality"""
         test_message = {"key": "value"}
@@ -76,6 +80,7 @@ class TestPublisher:
         assert kwargs["routing_key"] == "queue_1"
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_context_manager(self, publisher, mock_rabbit):
         """Test that Publisher works correctly as context manager"""
         async with publisher:

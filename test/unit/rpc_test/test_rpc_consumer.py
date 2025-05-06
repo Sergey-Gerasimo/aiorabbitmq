@@ -27,6 +27,7 @@ class TestRPCConsumer:
         return message
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_set_up_queue(self, consumer: RPCConsumer, mock_rabbit):
         """Test queue declaration with correct parameters"""
         await consumer.connect()
@@ -36,6 +37,7 @@ class TestRPCConsumer:
         assert queue == mock_rabbit["queue"]
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_process_message_success(
         self, consumer: RPCConsumer, mock_message, mock_rabbit
     ):
@@ -46,7 +48,7 @@ class TestRPCConsumer:
             await consumer.connect()
 
             with patch.object(
-                consumer.channel.default_exchange, "publish", AsyncMock()
+                consumer.exchange, "publish", AsyncMock()
             ) as mock_publish:
                 await consumer.process_message(mock_message)
 
@@ -64,6 +66,7 @@ class TestRPCConsumer:
                 assert mock_publish.call_args[0][0].body == test_response.encode()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_process_message_json_error(
         self, consumer: RPCConsumer, mock_message, mock_rabbit
     ):
@@ -76,6 +79,7 @@ class TestRPCConsumer:
             assert "Invalid JSON format" in str(mock_send_error.call_args[0][1])
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_process_message_no_reply_to(self, consumer, mock_message):
         """Test handling of messages without reply_to"""
         mock_message.reply_to = None
@@ -84,6 +88,7 @@ class TestRPCConsumer:
             # Shouldn't raise but should log error
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_consume_flow(self, consumer):
         """Test full consumption flow with message processing"""
         mock_queue = MagicMock(spec=AbstractQueue)

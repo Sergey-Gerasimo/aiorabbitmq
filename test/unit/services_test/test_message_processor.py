@@ -16,6 +16,7 @@ class TestResponseProcessor:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_handler_registration(self, processor: BaseResponseProcessor):
 
         @processor.add("test.action")
@@ -28,6 +29,7 @@ class TestResponseProcessor:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_duplicate_handler(self, processor):
         @processor.add("duplicate.action")
         async def first_handler(data):
@@ -40,11 +42,13 @@ class TestResponseProcessor:
                 pass
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_missing_handler(self, processor: BaseResponseProcessor):
         with pytest.raises(ResponseProcessorError):
             processor.get_handler("nonexistent.action")
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_invalid_message(self, processor):
         invalid_message = {"wrong": "structure"}
 

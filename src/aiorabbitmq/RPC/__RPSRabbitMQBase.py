@@ -17,9 +17,10 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
         amqp_url: str,
         exchange_name: str,
         queue_name: str,
+        exchange_type: ExchangeType = ExchangeType.DIRECT,
     ):
 
-        super().__init__(amqp_url, exchange_name)
+        super().__init__(amqp_url, exchange_name, exchange_type=exchange_type)
         self.queue_name = queue_name
 
         self._stop_event = asyncio.Event()
@@ -36,18 +37,19 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
                 "x-dead-letter-exchange": "dead_letters",
             },
         )
-
+        await queue.bind(self.exchange, self.queue_name)
         return queue
 
     async def process_message(self, message: AbstractIncomingMessage):
         try:
             async with message.process(requeue=False):
-                assert message.reply_to is not None
+                if message.reply_to is None:
+                    raise NoCorrelationIDException("Message has no correlation id")
 
                 data = json.loads(message.body.decode())
                 response = await self.callback(data)
                 response = response.encode()
-                await self.channel.default_exchange.publish(
+                await self.exchange.publish(
                     Message(
                         body=response,
                         correlation_id=message.correlation_id,
@@ -65,7 +67,7 @@ class RPSRabbitMQBaseConsumer(RabbitMQBase):
 
     async def send_error(self, message: AbstractIncomingMessage, error: str) -> None:
         error_response = json.dumps({"error": error})
-        await self.channel.default_exchange.publish(
+        await self.exchange.publish(
             Message(
                 body=error_response.encode(),
                 correlation_id=message.correlation_id,
@@ -107,6 +109,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
                 "x-dead-letter-exchange": "dead_letters",
             },
         )
+        await self.callback_queue.bind(self.exchange, self.callback_queue.name)
         await self.callback_queue.consume(self.on_response)
         return self
 
@@ -132,7 +135,7 @@ class RPSRabbitMQBasePublisher(RabbitMQBase):
         future = loop.create_future()
         self.futures[correlation_id] = future
         try:
-            await self.channel.default_exchange.publish(
+            await self.exchange.publish(
                 Message(
                     message.encode(),
                     content_type="text/plain",

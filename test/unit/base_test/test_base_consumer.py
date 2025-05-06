@@ -24,6 +24,7 @@ class TestRabbitMQConsumer:
         )
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_connection_setup(self, consumer, mock_rabbit):
         """Tests successful connection setup to RabbitMQ.
 
@@ -37,6 +38,7 @@ class TestRabbitMQConsumer:
         mock_rabbit["channel"].declare_exchange.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_queue_setup(self, consumer, mock_rabbit):
         """Tests successful queue setup.
 
@@ -51,6 +53,7 @@ class TestRabbitMQConsumer:
         assert queue == mock_rabbit["queue"]
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_queue_setup_failure(self, consumer, mock_rabbit):
         """Tests successful message processing flow.
 
@@ -67,6 +70,7 @@ class TestRabbitMQConsumer:
             await consumer.set_up_queue()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_message_processing_success(self, consumer, mock_rabbit):
         test_callback = AsyncMock()
         mock_message = MagicMock(spec=AbstractIncomingMessage)
@@ -84,6 +88,7 @@ class TestRabbitMQConsumer:
         test_callback.assert_awaited_once_with({"test": "data"})
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_consume_flow(self, consumer, mock_rabbit):
         """Tests the complete message consumption flow.
 
@@ -113,6 +118,7 @@ class TestRabbitMQConsumer:
             task.cancel()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_retry_mechanism_with_failures(self, consumer):
         """Tests the retry mechanism with continuous failures.
 
@@ -131,6 +137,7 @@ class TestRabbitMQConsumer:
             assert consumer.reconnect.await_count == 5
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_disconnect(self, consumer, mock_rabbit):
         """Tests proper connection cleanup.
 

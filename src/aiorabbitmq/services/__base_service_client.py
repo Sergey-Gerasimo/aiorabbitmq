@@ -3,139 +3,278 @@ from aiorabbitmq.RPC.RPSExceptions import RPCError
 from aiorabbitmq.abc import AbstractServiceClient
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from functools import wraps
 import json
+import logging
+import asyncio
 
 
-class ServiceConnectionError(Exception):
-    """Ошибка подключению к сервису"""
+logger = logging.getLogger("aiorabbitmq::BaseServiceClient")
 
 
-class ServiceExecuteError(Exception):
-    """Ошибка выполнения операции в сервисе"""
+class ServiceError(Exception):
+    """Base exception for all service-related errors with automatic logging."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        logger.error(f"ServiceError occurred: {message}")
+
+
+class ServiceConnectionError(ServiceError):
+    """Raised when connection to the service fails with connection-specific logging."""
+
+    def __init__(self, message: str):
+        error_msg = f"Connection failed: {message}"
+        super().__init__(error_msg)
+        logger.error(f"ServiceConnectionError: {error_msg}")
+
+
+class ServiceExecuteError(ServiceError):
+    """Raised when service operation fails with execution context logging."""
+
+    def __init__(self, message: str):
+        error_msg = f"Operation failed: {message}"
+        super().__init__(error_msg)
+        logger.error(f"ServiceExecuteError: {error_msg}")
+
+
+class ResponseProcessorError(ServiceError):
+    """Raised during message processing failures with detailed logging."""
+
+    def __init__(self, message: str):
+        error_msg = f"Processing failed: {message}"
+        super().__init__(error_msg)
+        logger.error(f"ResponseProcessorError: {error_msg}")
 
 
 class BaseServiceClient(AbstractServiceClient):
-    """Concrete implementation of a service client using AMQP/RPC.
+    """AMQP/RPC service client with comprehensive logging and examples.
 
-    This class provides default implementation for service communication using
-    AMQP protocol with RPC pattern.
+    Example Usage:
+        # Initialize client
+        >>> client = BaseServiceClient(
+        ...     amqp_url='amqp://user:pass@localhost:5672/vhost',
+        ...     exchange_name='order_processing',
+        ...     routing_key='payments.process',
+        ...     default_timeout=30
+        ... )
 
-    Attributes:
-        amqp_url (str): URL for AMQP broker connection.
-        exchange_name (str): Name of the AMQP exchange.
-        routing_key (str): Routing key for RPC messages.
-        RPS (RPSPublisher): Instance of RPC publisher.
+        # Using context manager
+        >>> async with client as connected_client:
+        ...     response = await process_order(connected_client, order_data)
+
+        # With RPC handler decorator
+        >>> @BaseServiceClient.handle_rpc_response
+        >>> async def process_order(client, order_data):
+        ...     return {
+        ...         "action": "process_order",
+        ...         "data": order_data,
+        ...         "metadata": {"source": "API"}
+        ...     }
     """
 
-    def __init__(self, amqp_url: str, exchange_name: str, routing_key: str):
-        """Initialize the service client.
+    def __init__(
+        self,
+        amqp_url: str,
+        exchange_name: str,
+        routing_key: str,
+        default_timeout: int = 30,
+        max_retries: int = 3,
+    ):
+        """Initialize AMQP/RPC client with connection parameters.
 
         Args:
-            amqp_url: URL for connecting to AMQP broker.
-            exchange_name: Name of the AMQP exchange to use.
+            amqp_url: AMQP broker connection URL.
+                Example: 'amqp://user:pass@rabbitmq:5672/vhost'
+            exchange_name: Name of AMQP exchange.
+                Example: 'order_events'
             routing_key: Routing key for RPC messages.
+                Example: 'orders.process'
+            default_timeout: Default timeout for RPC calls (seconds).
+            max_retries: Maximum connection attempts before failing.
+
+        Example:
+            >>> client = BaseServiceClient(
+            ...     amqp_url='amqp://localhost',
+            ...     exchange_name='payments',
+            ...     routing_key='process',
+            ...     default_timeout=45,
+            ...     max_retries=5
+            ... )
         """
+        logger.info(f"Initializing client for exchange: {exchange_name}")
         self.amqp_url = amqp_url
         self.exchange_name = exchange_name
         self.routing_key = routing_key
+        self.default_timeout = default_timeout
+        self.max_retries = max_retries
 
-        self.RPS = RPCPublisher(
-            amqp_url=amqp_url, exchange_name=exchange_name, routing_key=routing_key
-        )
-
+        self.RPS: Optional[RPCPublisher] = None
         self._is_connected: bool = False
+        self._connection_lock = asyncio.Lock()
 
     @property
     def is_connected(self) -> bool:
-        """bool: Indicates whether the client is connected to the service."""
-        return self._is_connected
-
-    async def connect(self) -> None:
-        """Establish connection with the AMQP broker.
-
-        Raises:
-            ServiceConnectionError: If connection fails.
-        """
-        try:
-            await self.RPS.connect()
-            self._is_connected = True
-        except Exception as e:
-            self._is_connected = False
-            raise ServiceConnectionError(
-                f"Unknown exception during connection to {self.amqp_url}: {e}"
-            )
-
-    async def disconnect(self) -> None:
-        """Close the connection and clean up resources."""
-        await self.RPS.close()
-        self._is_connected = False
-
-    async def __aenter__(self):
-        """Async context manager entry.
+        """Check connection status with debug logging.
 
         Returns:
-            BaseServiceClient: The connected client instance.
+            bool: True if connected to AMQP broker, False otherwise.
+
+        Example:
+            >>> if client.is_connected:
+            ...     print("Client is ready")
         """
+        status = self._is_connected and self.RPS is not None
+        logger.debug(f"Connection status check: {status}")
+        return status
+
+    async def connect(self) -> None:
+        """Establish connection to AMQP broker with retry logic and logging.
+
+        Example:
+            >>> try:
+            ...     await client.connect()
+            ... except ServiceConnectionError as e:
+            ...     print(f"Failed to connect: {e}")
+
+        Raises:
+            ServiceConnectionError: After max retry attempts.
+        """
+        async with self._connection_lock:
+            if self.is_connected:
+                logger.debug("Already connected, skipping reconnection")
+                return
+
+            logger.info(
+                f"Connecting to {self.amqp_url} (max retries: {self.max_retries})"
+            )
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    logger.debug(f"Connection attempt {attempt}/{self.max_retries}")
+                    self.RPS = RPCPublisher(
+                        amqp_url=self.amqp_url,
+                        exchange_name=self.exchange_name,
+                        routing_key=self.routing_key,
+                    )
+                    await self.RPS.connect()
+                    self._is_connected = True
+                    logger.info(f"Successfully connected to {self.exchange_name}")
+                    return
+                except Exception as e:
+                    logger.warning(f"Connection attempt {attempt} failed: {str(e)}")
+                    if attempt == self.max_retries:
+                        error_msg = (
+                            f"Failed after {self.max_retries} attempts: {str(e)}"
+                        )
+                        logger.error(error_msg)
+                        raise ServiceConnectionError(error_msg)
+                    await asyncio.sleep(min(attempt * 2, 10))
+
+    async def disconnect(self) -> None:
+        """Close connection and clean up resources with logging.
+
+        Example:
+            >>> await client.disconnect()
+            >>> print("Client disconnected")
+        """
+        async with self._connection_lock:
+            if self.RPS is not None:
+                try:
+                    logger.info("Closing AMQP connection")
+                    await self.RPS.close()
+                    logger.info("Connection closed successfully")
+                except Exception as e:
+                    logger.error(f"Error during disconnection: {str(e)}")
+                    raise
+                finally:
+                    self.RPS = None
+                    self._is_connected = False
+                    logger.debug("Connection state reset")
+
+    async def __aenter__(self):
+        """Async context manager entry with connection logging.
+
+        Example:
+            >>> async with BaseServiceClient(...) as client:
+            ...     await client.make_request(data)
+        """
+        logger.debug("Entering client context")
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
-        """Async context manager exit.
+        """Async context manager exit with error handling and logging.
 
-        Args:
-            exc_type: Exception type if raised in context.
-            exc_val: Exception value if raised in context.
-            exc_tb: Exception traceback if raised in context.
-
-        Returns:
-            bool: False to not suppress any exceptions.
+        Example:
+            >>> async with client:
+            ...     # Do work
+            ...     pass  # Auto-disconnects here
         """
+        logger.debug("Exiting client context")
         await self.disconnect()
-        if exc_type is not None:
-            ServiceExecuteError(f"Transaction error: {exc_val}")
+        if exc_val is not None:
+            logger.error(f"Context error occurred: {str(exc_val)}")
+            if not isinstance(exc_val, (ServiceConnectionError, ServiceExecuteError)):
+                raise ServiceExecuteError(f"Operation failed: {str(exc_val)}")
         return False
 
     @classmethod
     def handle_rpc_response(cls, func: Callable) -> Callable:
-        """Decorator to standardize RPC response handling.
+        """Decorator for standardizing RPC response handling with full logging.
 
-        Handles:
-        - Connection verification
-        - RPC error handling
-        - Response parsing
-        - Uniform exception reporting
-
-        Args:
-            func: The RPC method to wrap.
-
-        Returns:
-            Callable: Wrapped function with standardized error handling.
-
-        Raises:
-            ServiceConnectionError: If client is not connected.
-            ServiceExecuteError: For RPC or parsing failures.
+        Example:
+            >>> class OrderClient(BaseServiceClient):
+            ...     @BaseServiceClient.handle_rpc_response
+            ...     async def create_order(self, order_data):
+            ...         return {
+            ...             "action": "create_order",
+            ...             "data": order_data,
+            ...             "timestamp": datetime.now().isoformat()
+            ...         }
         """
 
         @wraps(func)
         async def wrapper(self, *args, **kwargs) -> Any:
-            if not self.is_connected:
-                raise ServiceConnectionError("Service client is not connected")
-
+            logger.info(f"Starting RPC call: {func.__name__}")
             try:
+                if not self.is_connected:
+                    error_msg = "RPC call attempted while disconnected"
+                    logger.error(error_msg)
+                    raise ServiceConnectionError(error_msg)
+
+                logger.debug("Preparing RPC request")
                 request = await func(self, *args, **kwargs)
-                response = await self.RPS.call(request, timeout=30)
-                return json.loads(response)
+                logger.debug(f"RPC request prepared: {request}")
+
+                logger.info("Making RPC call...")
+                response = await self.RPS.call(request, timeout=self.default_timeout)
+                logger.debug(f"Raw RPC response: {response}")
+
+                try:
+                    result = json.loads(response)
+                    logger.info("RPC call completed successfully")
+                    return result
+                except json.JSONDecodeError as e:
+                    error_msg = f"Invalid JSON response: {response}"
+                    logger.error(error_msg)
+                    raise ServiceExecuteError(error_msg) from e
 
             except RPCError as e:
-                raise ServiceExecuteError(f"RPC operation failed: {str(e)}") from e
-            except json.JSONDecodeError as e:
-                raise ServiceExecuteError("Invalid service response format") from e
+                logger.error(f"RPC protocol error: {str(e)}")
+                raise ServiceExecuteError(f"RPC failure: {str(e)}") from e
             except Exception as e:
-                raise ServiceExecuteError("Service operation failed") from e
+                logger.error(f"Unexpected RPC error: {str(e)}")
+                raise ServiceExecuteError(f"Operation failed: {str(e)}") from e
+            finally:
+                logger.debug(f"Completed RPC call: {func.__name__}")
 
         return wrapper
 
 
-__all__ = ["ServiceConnectionError", "ServiceExecuteError", "BaseServiceClient"]
+__all__ = [
+    "ServiceError",
+    "ServiceConnectionError",
+    "ServiceExecuteError",
+    "BaseServiceClient",
+]

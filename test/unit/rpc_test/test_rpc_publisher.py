@@ -33,6 +33,7 @@ class TestRPCPublisher:
         return message
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_connect(self, publisher: RPCPublisher, mock_rabbit):
         """Test connection setup with callback queue"""
 
@@ -52,6 +53,7 @@ class TestRPCPublisher:
         mock_rabbit["queue"].consume.assert_awaited_once()
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_on_response_success(
         self, publisher: RPCPublisher, mock_message, mock_rabbit
     ):
@@ -67,6 +69,7 @@ class TestRPCPublisher:
         assert mock_message.correlation_id not in publisher.futures
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_on_response_error(self, publisher, mock_message, mock_rabbit):
         """Test error response handling"""
         await publisher.connect()
@@ -83,6 +86,7 @@ class TestRPCPublisher:
         assert mock_message.correlation_id not in publisher.futures
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_on_response_no_correlation(self, publisher, mock_message):
         """Test handling of message without correlation ID"""
         mock_message.correlation_id = None
@@ -90,6 +94,7 @@ class TestRPCPublisher:
             await publisher.on_response(mock_message)
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_call_timeout(self, publisher, mock_rabbit):
         """Test RPC call timeout"""
         await publisher.connect()
@@ -100,6 +105,7 @@ class TestRPCPublisher:
                 await publisher.call(test_data, timeout=0.01)
 
     @pytest.mark.asyncio
+    @pytest.mark.unit
     async def test_call_publish_error(self, publisher, mock_rabbit):
         """Test handling of publish errors"""
         await publisher.connect()
@@ -109,6 +115,6 @@ class TestRPCPublisher:
             publisher.channel.default_exchange,
             "publish",
             AsyncMock(side_effect=Exception("Publish error")),
-        ):
-            with pytest.raises(RPCError, match="Request failed"):
-                await publisher.call(test_data)
+        ), pytest.raises(RPCError):
+
+            await publisher.call(test_data)

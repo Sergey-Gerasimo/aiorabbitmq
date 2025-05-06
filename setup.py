@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="aiorabbitmq",
-    version="0.1.0",
+    version="1.0.0",
     author="Sergey",
     author_email="gerasimovsergey2004@gmail.com",
     description="Short description of your package",
@@ -29,6 +29,8 @@ setup(
             "pytest>=7.0",
             "pytest-asyncio",
             "aio-pika",
+            "tenacity",
+            "docker",
         ]
     },
     classifiers=[
